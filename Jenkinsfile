@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = 'secure-devops-app'
+        CONTAINER_NAME = 'secure-devops-app'
+        APP_PORT = '8080'
+    }
+
     stages {
 
         stage('Checkout') {
@@ -19,7 +25,7 @@ pipeline {
 
         stage('Dependency Security Scan') {
             steps {
-                echo 'Scanning Node.js dependencies for High/Critical vulnerabilities...'
+                echo 'Scanning Node.js dependencies for HIGH and CRITICAL vulnerabilities...'
                 sh 'npm audit --audit-level=high'
             }
         }
@@ -33,37 +39,36 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo 'Building Docker image...'
-                sh 'docker build -t secure-devops-app:latest .'
+                sh 'docker build -t ${IMAGE_NAME}:latest .'
             }
         }
 
         stage('Container Security Scan') {
             steps {
-                echo 'Scanning Docker image with Trivy...'
+                echo 'Running Trivy container security scan...'
 
                 sh '''
                     docker run --rm \
-                      -v /var/run/docker.sock:/var/run/docker.sock \
-                      aquasec/trivy:latest \
-                      image \
-                      --severity HIGH,CRITICAL \
-                      --exit-code 0 \
-                      secure-devops-app:latest
+                    -v /var/run/docker.sock:/var/run/docker.sock \
+                    aquasec/trivy:latest image \
+                    --severity HIGH,CRITICAL \
+                    --exit-code 1 \
+                    ${IMAGE_NAME}:latest
                 '''
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Deploying application container...'
+                echo 'Security scan passed. Deploying application...'
 
                 sh '''
-                    docker rm -f secure-devops-app || true
+                    docker rm -f ${CONTAINER_NAME} || true
 
                     docker run -d \
-                      --name secure-devops-app \
-                      -p 8080:8080 \
-                      secure-devops-app:latest
+                    --name ${CONTAINER_NAME} \
+                    -p ${APP_PORT}:${APP_PORT} \
+                    ${IMAGE_NAME}:latest
                 '''
             }
         }
@@ -74,8 +79,11 @@ pipeline {
 
                 sh '''
                     sleep 5
+
                     docker ps
-                    docker exec secure-devops-app wget -qO- http://localhost:8080
+
+                    docker exec ${CONTAINER_NAME} \
+                    wget -qO- http://localhost:${APP_PORT}
                 '''
             }
         }
@@ -85,11 +93,13 @@ pipeline {
 
         success {
             echo 'Pipeline completed successfully.'
-            echo 'Application built, security scanned, deployed and verified successfully.'
+            echo 'Application passed security checks, deployed and verified successfully.'
         }
 
         failure {
-            echo 'Pipeline failed. Check the console output.'
+            echo 'Pipeline failed.'
+            echo 'A build, security, deployment or verification stage failed.'
+            echo 'Check the Jenkins console output for details.'
         }
 
         always {
