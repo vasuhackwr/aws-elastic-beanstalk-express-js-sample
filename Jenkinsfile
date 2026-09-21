@@ -17,9 +17,9 @@ pipeline {
             }
         }
 
-        stage('Security Scan') {
+        stage('Dependency Security Scan') {
             steps {
-                echo 'Scanning dependencies for High/Critical vulnerabilities...'
+                echo 'Scanning Node.js dependencies for High/Critical vulnerabilities...'
                 sh 'npm audit --audit-level=high'
             }
         }
@@ -37,6 +37,22 @@ pipeline {
             }
         }
 
+        stage('Container Security Scan') {
+            steps {
+                echo 'Scanning Docker image with Trivy...'
+
+                sh '''
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      aquasec/trivy:latest \
+                      image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 0 \
+                      secure-devops-app:latest
+                '''
+            }
+        }
+
         stage('Deploy') {
             steps {
                 echo 'Deploying application container...'
@@ -45,9 +61,9 @@ pipeline {
                     docker rm -f secure-devops-app || true
 
                     docker run -d \
-                        --name secure-devops-app \
-                        -p 8080:8080 \
-                        secure-devops-app:latest
+                      --name secure-devops-app \
+                      -p 8080:8080 \
+                      secure-devops-app:latest
                 '''
             }
         }
@@ -69,7 +85,7 @@ pipeline {
 
         success {
             echo 'Pipeline completed successfully.'
-            echo 'Application built, scanned, deployed and verified successfully.'
+            echo 'Application built, security scanned, deployed and verified successfully.'
         }
 
         failure {
