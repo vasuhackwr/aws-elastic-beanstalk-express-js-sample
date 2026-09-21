@@ -5,6 +5,7 @@ pipeline {
         IMAGE_NAME = 'secure-devops-app'
         CONTAINER_NAME = 'secure-devops-app'
         APP_PORT = '8080'
+        HOST_PORT = '8081'
     }
 
     stages {
@@ -19,7 +20,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo 'Installing Node.js dependencies...'
-                sh 'npm install'
+                sh 'npm ci'
             }
         }
 
@@ -38,8 +39,8 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                echo 'Building Docker image...'
-                sh 'docker build -t ${IMAGE_NAME}:latest .'
+                echo 'Building hardened Docker image...'
+                sh 'docker build --no-cache -t ${IMAGE_NAME}:latest .'
             }
         }
 
@@ -67,7 +68,7 @@ pipeline {
 
                     docker run -d \
                     --name ${CONTAINER_NAME} \
-                    -p ${APP_PORT}:${APP_PORT} \
+                    -p ${HOST_PORT}:${APP_PORT} \
                     ${IMAGE_NAME}:latest
                 '''
             }
@@ -90,7 +91,6 @@ pipeline {
     }
 
     post {
-
         success {
             echo 'Pipeline completed successfully.'
             echo 'Application passed security checks, deployed and verified successfully.'
