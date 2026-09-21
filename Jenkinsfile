@@ -3,6 +3,8 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'secure-devops-app'
+        DOCKERHUB_IMAGE = 'vasu1257/secure-devops-app'
+
         CONTAINER_NAME = 'secure-devops-app'
         APP_PORT = '8080'
         HOST_PORT = '8081'
@@ -47,7 +49,7 @@ pipeline {
 
         stage('Dependency Security Scan') {
             steps {
-                echo 'Scanning dependencies for HIGH and CRITICAL vulnerabilities using Node 16...'
+                echo 'Scanning dependencies for HIGH and CRITICAL vulnerabilities...'
 
                 sh '''
                     docker run --rm \
@@ -116,9 +118,52 @@ pipeline {
             }
         }
 
+        stage('Tag Docker Image') {
+            steps {
+                echo 'Tagging security-approved image for Docker Hub...'
+
+                sh '''
+                    docker tag \
+                    ${IMAGE_NAME}:latest \
+                    ${DOCKERHUB_IMAGE}:${BUILD_NUMBER}
+
+                    docker tag \
+                    ${IMAGE_NAME}:latest \
+                    ${DOCKERHUB_IMAGE}:latest
+                '''
+            }
+        }
+
+        stage('Publish to Docker Hub') {
+            steps {
+                echo 'Publishing security-approved Docker image to Docker Hub...'
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKERHUB_USERNAME',
+                        passwordVariable: 'DOCKERHUB_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DOCKERHUB_TOKEN" | \
+                        docker login \
+                        -u "$DOCKERHUB_USERNAME" \
+                        --password-stdin
+
+                        docker push ${DOCKERHUB_IMAGE}:${BUILD_NUMBER}
+                        docker push ${DOCKERHUB_IMAGE}:latest
+
+                        docker logout
+                    '''
+                }
+            }
+        }
+
         stage('Deploy') {
             steps {
-                echo 'Security gates passed. Deploying application...'
+                echo 'Security gates passed and image published.'
+                echo 'Deploying application...'
 
                 sh '''
                     docker rm -f ${CONTAINER_NAME} || true
@@ -126,7 +171,7 @@ pipeline {
                     docker run -d \
                     --name ${CONTAINER_NAME} \
                     -p ${HOST_PORT}:${APP_PORT} \
-                    ${IMAGE_NAME}:latest
+                    ${DOCKERHUB_IMAGE}:${BUILD_NUMBER}
                 '''
             }
         }
@@ -151,13 +196,15 @@ pipeline {
 
         success {
             echo 'Pipeline completed successfully.'
-            echo 'Unit tests and security gates passed.'
+            echo 'Unit tests passed.'
+            echo 'Dependency and container security gates passed.'
+            echo 'Docker image published to Docker Hub.'
             echo 'Application deployed and verified successfully.'
         }
 
         failure {
             echo 'Pipeline failed.'
-            echo 'A build, test, security, deployment, or verification stage failed.'
+            echo 'A build, test, security, publication, deployment, or verification stage failed.'
             echo 'Check the Jenkins console output for details.'
         }
 
