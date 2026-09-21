@@ -2,15 +2,25 @@ pipeline {
     agent any
 
     stages {
+
         stage('Checkout') {
             steps {
+                echo 'Checking out source code from GitHub...'
                 checkout scm
             }
         }
 
         stage('Install Dependencies') {
             steps {
+                echo 'Installing Node.js dependencies...'
                 sh 'npm install'
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                echo 'Scanning dependencies for High/Critical vulnerabilities...'
+                sh 'npm audit --audit-level=high'
             }
         }
 
@@ -22,7 +32,8 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker build -t secure-devops-app .'
+                echo 'Building Docker image...'
+                sh 'docker build -t secure-devops-app:latest .'
             }
         }
     }
@@ -31,8 +42,13 @@ pipeline {
         success {
             echo 'Pipeline completed successfully.'
         }
+
         failure {
             echo 'Pipeline failed. Check the console output.'
+        }
+
+        always {
+            echo 'CI/CD pipeline execution finished.'
         }
     }
 }
