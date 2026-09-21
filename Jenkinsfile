@@ -10,19 +10,19 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                bat 'npm install'
+                sh 'npm install'
             }
         }
 
         stage('Test') {
             steps {
-                bat 'npm test'
+                sh 'npm test'
             }
         }
 
         stage('Docker Build') {
             steps {
-                bat 'docker build -t secure-devops-app .'
+                sh 'docker build -t secure-devops-app .'
             }
         }
     }
@@ -31,6 +31,7 @@ pipeline {
         success {
             echo 'Pipeline completed successfully!'
         }
+
         failure {
             echo 'Pipeline failed. Check the console output.'
         }
