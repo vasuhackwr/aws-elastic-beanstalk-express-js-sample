@@ -36,11 +36,40 @@ pipeline {
                 sh 'docker build -t secure-devops-app:latest .'
             }
         }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying application container...'
+
+                sh '''
+                    docker rm -f secure-devops-app || true
+
+                    docker run -d \
+                        --name secure-devops-app \
+                        -p 8080:8080 \
+                        secure-devops-app:latest
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                echo 'Verifying application deployment...'
+
+                sh '''
+                    sleep 5
+                    docker ps
+                    docker exec secure-devops-app wget -qO- http://localhost:8080
+                '''
+            }
+        }
     }
 
     post {
+
         success {
             echo 'Pipeline completed successfully.'
+            echo 'Application built, scanned, deployed and verified successfully.'
         }
 
         failure {
